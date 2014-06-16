@@ -15,6 +15,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+
+@rs.projects.get(37).the
+@rs.projects.list()
+
+
+
+@rs.sprints.listByProject(1)
+
 taiga = @.taiga
 
 class ResourcesService extends taiga.TaigaService
@@ -22,7 +30,7 @@ class ResourcesService extends taiga.TaigaService
 
     constructor: (@q, @repo, @urls, @model) ->
         super()
-
+    
     #############################################################################
     # Common
     #############################################################################
@@ -30,22 +38,30 @@ class ResourcesService extends taiga.TaigaService
     getProject: (projectId) ->
         return @repo.queryOne("projects", projectId)
 
+    getProjects: ->
+        return @repo.queryMany("projects")
+
     #############################################################################
     # Backlog
     #############################################################################
 
-    getMilestones: (projectId) ->
-        return @repo.queryMany("milestones", {project:projectId}).then (milestones) =>
+    getSprints: (projectId) ->
+        params = {"project": projectId}
+        return @repo.queryMany("milestones", params).then (milestones) =>
             for m in milestones
                 uses = m.user_stories
                 uses = _.map(uses, (u) => @model.make_model("userstories", u))
                 m._attrs.user_stories = uses
             return milestones
 
-    getBacklog: (projectId) ->
+    getUnassignedUserstories: (projectId) ->
         params = {"project": projectId, "milestone": "null"}
         return @repo.queryMany("userstories", params)
 
+
+    sprints: {
+        getById: (id) ->
+        list: ->
 
 init = (urls) ->
     urls.update({
