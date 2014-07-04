@@ -33,7 +33,7 @@ module = angular.module("taigaBacklog")
 ## Backlog Controller
 #############################################################################
 
-class BacklogController extends mixOf(taiga.Controller, taiga.PageMixin)
+class BacklogController extends mixOf(taiga.Controller, taiga.PageMixin, taiga.FiltersMixin)
     @.$inject = [
         "$scope",
         "$rootScope",
@@ -41,10 +41,11 @@ class BacklogController extends mixOf(taiga.Controller, taiga.PageMixin)
         "$tgConfirm",
         "$tgResources",
         "$routeParams",
-        "$q"
+        "$q",
+        "$tgLocation"
     ]
 
-    constructor: (@scope, @rootscope, @repo, @confirm, @rs, @params, @q) ->
+    constructor: (@scope, @rootscope, @repo, @confirm, @rs, @params, @q, @location) ->
         _.bindAll(@)
 
         @scope.sectionName = "Backlog"
@@ -75,6 +76,8 @@ class BacklogController extends mixOf(taiga.Controller, taiga.PageMixin)
         return @rs.userstories.listUnassigned(@scope.projectId).then (userstories) =>
             @scope.userstories = userstories
             @scope.filters = @.generateFilters()
+
+            @rootscope.$broadcast("filters:loaded", @scope.filters)
 
             @.filterVisibleUserstories()
             # The broadcast must be executed when the DOM has been fully reloaded.
@@ -128,7 +131,7 @@ class BacklogController extends mixOf(taiga.Controller, taiga.PageMixin)
     generateFilters: ->
         filters = {}
         plainTags = _.flatten(_.map(@scope.userstories, "tags"))
-        filters.tags = _.map(_.countBy(plainTags), (v, k) -> {name: k, count:v})
+        filters.tags = _.map(_.countBy(plainTags), (v, k) -> {id:k, type:"tags", name: k, count:v})
         return filters
 
     ## Template actions
