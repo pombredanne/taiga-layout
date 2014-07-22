@@ -203,13 +203,13 @@ module.directive("tgLbCreateBulkUserstories", [
 ## AssignedTo Lightbox Directive
 #############################################################################
 
-AssignedToLightboxDirective = ->
+AssignedToLightboxDirective = ($repo) ->
     template = _.template("""
     <% if (selected) { %>
     <div class="watcher-single active">
         <div class="watcher-avatar">
             <a href="" title="Assigned to" class="avatar">
-                <img ng-src="selectedUser.photo"/>
+                <img src="<%= selected.photo %>"/>
             </a>
         </div>
         <a href="" title="<%- selected.full_name_display %>" class="watcher-name">
@@ -220,14 +220,14 @@ AssignedToLightboxDirective = ->
     <% } %>
 
     <% _.each(users, function(user) { %>
-    <div class="watcher-single">
+    <div class="watcher-single" data-user-id="<%- user.id %>">
         <div class="watcher-avatar">
             <a href="#" title="Assigned to" class="avatar">
                 <img src="<%= user.photo %>" />
             </a>
         </div>
-        <a href="" title="<%- selected.full_name_display %>" class="watcher-name">
-            <%-selected.full_name_display %>
+        <a href="" title="<%- user.full_name_display %>" class="watcher-name">
+            <%- user.full_name_display %>
         </a>
     </div>
     <% }) %>
@@ -241,62 +241,72 @@ AssignedToLightboxDirective = ->
 
 
     link = ($scope, $el, $attrs) ->
-        editingItem = null
+        selectedUser = null
+        selectedItem = null
 
-        render = (users) ->
+        filterUsers = (text, user) ->
+            username = user.full_name_display.toUpperCase()
+            text = text.toUpperCase()
+            return _.contains(username, text)
 
-        bindOnce $scope, "usersBy", (v) ->
-
-
-        updateScopeFilteringUsers = (searchingText) ->
-            usersById = _.clone($scope.usersById, false)
-
-            # Exclude selected user
-            if $scope.selectedUser?
-                delete usersById[$scope.selectedUser.id]
-
-            # Filter text
-            usersById = _.filter usersById,  (user) ->
-                return _.contains(user.full_name_display.toUpperCase(), searchingText.toUpperCase())
-
-            # Return max of 5 items
-            users = _.map(usersById, (user) -> user)
-            $scope.usersSearch = searchingText
-            $scope.filteringUsers = users.length > 5
-            $scope.filteredUsers = _.first(users, 5)
-
-        $scope.$on "assigned-to:add", (ctx, item) ->
-            editingItem = item
-            assignedToId = editingItem?.assigned_to
-
-            $scope.selectedUser = $scope.usersById[assignedToId] if assignedToId?
-            updateScopeFilteringUsers("")
-
-            $el.removeClass("hidden")
+        render = (selected, text) ->
             $el.find("input").focus()
 
+            users = _.clone($scope.users, true)
+            users = _.reject(users, {"id": selected.id}) if selected?
+            users = _.filter(users, _.partial(filterUsers, text)) if text?
+
+            ctx = {
+                selected: selected
+                users: _.first(users, 5)
+                showMore: users.length > 5
+            }
+
+            html = template(ctx)
+            $el.find("div.watchers").html(html)
+
+        $scope.$on "assigned-to:add", (ctx, item) ->
+            selectedItem = item
+            assignedToId = item.assigned_to
+            selectedUser = $scope.usersById[assignedToId]
+
+            render(selectedUser)
+            $el.removeClass("hidden")
+
         $scope.$watch "usersSearch", (searchingText) ->
-            updateScopeFilteringUsers(searchingText)
+            render(selectedUser, searchingText) if searchingText?
 
         $el.on "click", ".watcher-single", (event) ->
             event.preventDefault()
             target = angular.element(event.currentTarget)
-            if editingItem?
-                user = target.scope().user
-                editingItem.assigned_to = user.id
 
             $el.addClass("hidden")
-            $scope.$broadcast("assigned-to:added", editingItem)
+            if not selectedItem?
+                return
+
+            selectedItem.assigned_to = target.data("user-id")
+            $scope.$apply ->
+                promise = $repo.save(selectedItem)
+                promise.then ->
+                    $scope.$broadcast("assigned-to:added", selectedItem)
+                promise.then null, ->
+                    console.log "FAIL" # TODO
 
         $el.on "click", ".remove-assigned-to", (event) ->
             event.preventDefault()
             event.stopPropagation()
 
-            if editingItem?
-                editingItem.assigned_to = null
-
             $el.addClass("hidden")
-            $scope.$broadcast("assigned-to:added", editingItem)
+            if not selectedItem?
+                return
+
+            selectedItem.assigned_to = null
+            $scope.$apply ->
+                promise = $repo.save(selectedItem)
+                promise.then ->
+                    $scope.$broadcast("assigned-to:added", selectedItem)
+                promise.then null, ->
+                    console.log "FAIL" # TODO
 
         $el.on "click", ".close", (event) ->
             event.preventDefault()
@@ -311,4 +321,4 @@ AssignedToLightboxDirective = ->
     }
 
 
-module.directive("tgLbAssignedto", AssignedToLightboxDirective)
+module.directive("tgLbAssignedto", ["$tgRepo", AssignedToLightboxDirective])
