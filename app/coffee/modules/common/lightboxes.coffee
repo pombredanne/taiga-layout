@@ -21,6 +21,8 @@
 
 module = angular.module("taigaCommon")
 
+bindOnce = @.taiga.bindOnce
+
 #############################################################################
 ## Block Directive
 #############################################################################
@@ -202,12 +204,53 @@ module.directive("tgLbCreateBulkUserstories", [
 #############################################################################
 
 AssignedToLightboxDirective = ->
+    template = _.template("""
+    <% if (selected) { %>
+    <div class="watcher-single active">
+        <div class="watcher-avatar">
+            <a href="" title="Assigned to" class="avatar">
+                <img ng-src="selectedUser.photo"/>
+            </a>
+        </div>
+        <a href="" title="<%- selected.full_name_display %>" class="watcher-name">
+            <%-selected.full_name_display %>
+        </a>
+        <a href="" title="Remove assigned" class="icon icon-delete remove-assigned-to"></a>
+    </div>
+    <% } %>
+
+    <% _.each(users, function(user) { %>
+    <div class="watcher-single">
+        <div class="watcher-avatar">
+            <a href="#" title="Assigned to" class="avatar">
+                <img src="<%= user.photo %>" />
+            </a>
+        </div>
+        <a href="" title="<%- selected.full_name_display %>" class="watcher-name">
+            <%-selected.full_name_display %>
+        </a>
+    </div>
+    <% }) %>
+
+    <% if (showMore) { %>
+    <div ng-show="filteringUsers" class="more-watchers">
+        <span>...too many users, keep filtering</span>
+    </div>
+    <% } %>
+    """)
+
+
     link = ($scope, $el, $attrs) ->
-        editingElement = null
+        editingItem = null
+
+        render = (users) ->
+
+        bindOnce $scope, "usersBy", (v) ->
+
 
         updateScopeFilteringUsers = (searchingText) ->
-            console.log "updateScopeFilteringUsers", searchingText
             usersById = _.clone($scope.usersById, false)
+
             # Exclude selected user
             if $scope.selectedUser?
                 delete usersById[$scope.selectedUser.id]
@@ -216,45 +259,44 @@ AssignedToLightboxDirective = ->
             usersById = _.filter usersById,  (user) ->
                 return _.contains(user.full_name_display.toUpperCase(), searchingText.toUpperCase())
 
-            # Return max of 5 elements
+            # Return max of 5 items
             users = _.map(usersById, (user) -> user)
-            $scope.AssignedToUsersSearch = searchingText
+            $scope.usersSearch = searchingText
             $scope.filteringUsers = users.length > 5
             $scope.filteredUsers = _.first(users, 5)
 
-        $scope.$on "assigned-to:add", (ctx, element) ->
-            editingElement = element
-            assignedToId = editingElement?.assigned_to
+        $scope.$on "assigned-to:add", (ctx, item) ->
+            editingItem = item
+            assignedToId = editingItem?.assigned_to
 
-            $scope.selectedUser = null
             $scope.selectedUser = $scope.usersById[assignedToId] if assignedToId?
             updateScopeFilteringUsers("")
 
             $el.removeClass("hidden")
             $el.find("input").focus()
 
-        $scope.$watch "AssignedToUsersSearch", (searchingText) ->
+        $scope.$watch "usersSearch", (searchingText) ->
             updateScopeFilteringUsers(searchingText)
 
         $el.on "click", ".watcher-single", (event) ->
             event.preventDefault()
             target = angular.element(event.currentTarget)
-            if editingElement?
+            if editingItem?
                 user = target.scope().user
-                editingElement.assigned_to = user.id
+                editingItem.assigned_to = user.id
 
             $el.addClass("hidden")
-            $scope.$broadcast("assigned-to:added", editingElement)
+            $scope.$broadcast("assigned-to:added", editingItem)
 
         $el.on "click", ".remove-assigned-to", (event) ->
             event.preventDefault()
             event.stopPropagation()
 
-            if editingElement?
-                editingElement.assigned_to = null
+            if editingItem?
+                editingItem.assigned_to = null
 
             $el.addClass("hidden")
-            $scope.$broadcast("assigned-to:added", editingElement)
+            $scope.$broadcast("assigned-to:added", editingItem)
 
         $el.on "click", ".close", (event) ->
             event.preventDefault()
@@ -263,7 +305,10 @@ AssignedToLightboxDirective = ->
         $scope.$on "$destroy", ->
             $el.off()
 
-    return {link:link}
+    return {
+        templateUrl: "/partials/views/modules/lightbox-assigned-to.html"
+        link:link
+    }
 
 
 module.directive("tgLbAssignedto", AssignedToLightboxDirective)

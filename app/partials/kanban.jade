@@ -4,7 +4,8 @@ block head
     title Taiga  Project management web application with scrum in mind!
 
 block content
-    div.wrapper(tg-kanban, ng-controller="KanbanController as ctrl")
+    div.wrapper(tg-kanban, ng-controller="KanbanController as ctrl"
+                ng-init="section='kanban'")
         section.main.kanban
             div.kanban-detail-header
                 h1
@@ -24,3 +25,5 @@ block content
 
         div.lightbox.lightbox_add-new-us.hidden(tg-lb-create-edit-userstory)
             include views/modules/lightbox_add-new-us
+
+        div.lightbox.lightbox_select_user.hidden(tg-lb-assignedto)
